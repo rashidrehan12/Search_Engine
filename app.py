@@ -23,6 +23,7 @@ st.markdown(
         font-family: 'Poppins', sans-serif;
         background: #121212;
         color: #e0e0e0;
+        margin: 0;
     }
 
     .main {
@@ -45,6 +46,13 @@ st.markdown(
         border-radius: 5px;
         border: none;
         box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+        padding: 10px 20px;
+        transition: background-color 0.3s ease;
+    }
+
+    .stButton>button:hover {
+        background-color: #0056b3;
     }
 
     .stTextInput>div>div>input {
@@ -71,6 +79,7 @@ st.markdown(
         line-height: 1.5;
         display: flex;
         align-items: center;
+        animation: fadeIn 0.5s ease-in;
     }
 
     .stChatMessage.user {
@@ -99,6 +108,15 @@ st.markdown(
 
     .stSidebar .stSidebarContent h3 {
         color: white;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
     }
     </style>
     """,
@@ -136,7 +154,12 @@ else:
 
     num_results = st.sidebar.slider("📊 Number of Results", 1, 5, 3)
 
-    # Initialize messages
+    # Add Clear Chat History button
+    if st.sidebar.button("Clear Chat History"):
+        st.session_state["messages"] = [{"role": "assistant", "content": "Hi, I'm a chatbot who can search the web. How can I help you?"}]
+        st.experimental_rerun()
+
+    # Initialize messages if not already done
     if "messages" not in st.session_state:
         st.session_state["messages"] = [
             {"role": "assistant", "content": "Hi, I'm a chatbot who can search the web. How can I help you?"}
@@ -161,19 +184,26 @@ else:
 
         search_agent = initialize_agent(tools, llm, agent=agent, handling_parsing_errors=True)
 
-        # Handle the response and prevent infinite loops
-        try:
-            with st.chat_message("assistant"):
-                st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
-                response = search_agent.run(st.session_state.messages, callbacks=[st_cb])
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.markdown(f"<div class='stChatMessage assistant'>{response}</div>", unsafe_allow_html=True)
-        except Exception as e:
-            st.session_state.messages.append({"role": "assistant", "content": "Sorry, something went wrong while processing your request. Please try again."})
-            st.markdown(f"<div class='stChatMessage assistant'>Sorry, something went wrong while processing your request. Please try again.</div>", unsafe_allow_html=True)
+        # Display a loading spinner while processing
+        with st.spinner("Processing your request..."):
+            try:
+                with st.chat_message("assistant"):
+                    st_cb = StreamlitCallbackHandler(st.container(), expand_new_thoughts=False)
+                    response = search_agent.run(st.session_state.messages, callbacks=[st_cb])
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.markdown(f"<div class='stChatMessage assistant'>{response}</div>", unsafe_allow_html=True)
+            except Exception as e:
+                st.session_state.messages.append({"role": "assistant", "content": "Sorry, something went wrong while processing your request. Please try again."})
+                st.markdown(f"<div class='stChatMessage assistant'>Sorry, something went wrong while processing your request. Please try again.</div>", unsafe_allow_html=True)
 
     # Optional: Display chat history
     if st.sidebar.checkbox("Show Chat History"):
         st.sidebar.subheader("Chat History")
         for i, msg in enumerate(st.session_state.messages):
             st.sidebar.write(f"{i+1}: {msg['role']} - {msg['content']}")
+
+    # User feedback section
+    st.sidebar.subheader("👍 Your Feedback")
+    feedback = st.sidebar.radio("Was the response helpful?", ("Yes", "No"))
+    if st.sidebar.button("Submit Feedback"):
+        st.sidebar.write(f"Thank you for your feedback: {feedback}")
